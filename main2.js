@@ -64,13 +64,15 @@ var app = http.createServer(function(request,response){
           // id=? 사용하면 쿼리문에 queryData.id를 직접 삽입하지 않고, ?를 대체할 내용을
           // 배열의 형태로 전달하게 된다. 이렇게 되면, 사용자가 url을 통해 db 쿼리문을 조작해 발생할
           // 문제를 방지할 수 있다. (기존에는 WHERE id= ${queryData.id} 였다)
-          db.query(`SELECT * FROM topic WHERE id=?`, [queryData.id], function(error2, topic){
+          db.query(`SELECT * FROM topic, author WHERE topic.author_id = author.id AND topic.id=?`
+            , [queryData.id], function(error2, topic){
             if(error2) throw error
                 var title = topic[0].title;
                 var description = topic[0].description;
+                var author = topic[0].name;
                 var list = template.list(topics);
                 var html = template.HTML(title, list,
-                  `<h2>${title}</h2>${description}`,
+                  `<h2>${title}</h2>${description}<br>by ${author}`,
                   ` <a href="/create">create</a>
                     <a href="/update?id=${queryData.id}">update</a>
                     <form action="delete_process" method="post">
@@ -86,6 +88,9 @@ var app = http.createServer(function(request,response){
       }
     } else if(pathname === '/create'){
       db.query('SELECT * FROM topic', function (error, topics) {
+        if(error) throw error
+          db.query('SELECT * FROM author', function (error2, author) {
+            if(error2) throw error2
           var title = 'WEB - create';
           var list = template.list(topics);
           var html = template.HTML(title, list, `
@@ -95,12 +100,16 @@ var app = http.createServer(function(request,response){
                 <textarea name="description" placeholder="description"></textarea>
               </p>
               <p>
+                ${template.tagSelect(author)}
+              </p>
+              <p>
                 <input type="submit">
               </p>
             </form>
           `, '');
           response.writeHead(200);
           response.end(html);
+        });
       });
     } else if(pathname === '/create_process'){
       var body = '';
@@ -113,7 +122,7 @@ var app = http.createServer(function(request,response){
           //  db의 보안을 위해서 []에 있는 값으로 대체하게 하였다. 이렇게 되면,
           // 사용자가 create form을 통해 db 쿼리문을 조작해 발생할 문제를 방지할 수 있다.
           db.query(`INSERT INTO topic (title, description, created, author_id )VALUES (?,?,NOW(),?)`,
-          [post.title,post.description,1],function(error,topics) {
+          [post.title,post.description,post.author],function(error,topics) {
             if(error) throw error
             // Location을 통한 리다이렉션을 할 때, 우리는 헌재 삽입한 queryData.id를 알 수가 없다. 그래서,
             // result.insertId를 사용하면 삽입된 쿼리문의 PK를 즉시 불러올 수 있게 된다.
@@ -125,10 +134,12 @@ var app = http.createServer(function(request,response){
     } else if(pathname === '/update'){
       db.query('SELECT * FROM topic',function(error,topics){
         if(error) throw error
-        db.query('SELECT * FROM topic WHERE id=?',[queryData.id],function(error2,topic){
+        db.query(`SELECT * FROM topic WHERE id=?`
+          ,[queryData.id],function(error2,topic){
           if(error2) throw error2
            var title = 'Web - update';
            var list = template.list(topics);
+           console.log(topic[0]);
            var html = template.HTML(title, list,
             `<form action="/update_process" method="post">
               <input type="hidden" name="id" value="${topic[0].id}">
@@ -148,10 +159,8 @@ var app = http.createServer(function(request,response){
       });
       request.on('end', function(){
           var post = qs.parse(body);
-          var id = post.id;
-          var title = post.title;
-          var description = post.description;
-          db.query("UPDATE topic SET title=?, description=? WHERE id = ? author_id = ?", [post.title,post.description,post.id,1],function(error,topic){
+          db.query("UPDATE topic SET title=?, description=? WHERE id = ? "
+          , [post.title,post.description,post.id,],function(error,topic){
             if(error) throw error;
             response.writeHead(302, {Location: `/?id=${post.id}`});
             response.end();
