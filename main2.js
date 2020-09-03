@@ -4,12 +4,9 @@ mysql 쿼리문을 통해서 처리하게 변경한다.
 */
 
 var http = require('http');
-var fs = require('fs');
 var url = require('url');
 var qs = require('querystring');
 var template = require('./lib/template.js');
-var path = require('path');
-var sanitizeHtml = require('sanitize-html');
 // mysql 모듈을 사용한다
 var mysql = require('mysql');
 
@@ -121,6 +118,7 @@ var app = http.createServer(function(request,response){
           //  INSERT문을 이용해 create_process를 수행한다. 이때 각 ? 값은
           //  db의 보안을 위해서 []에 있는 값으로 대체하게 하였다. 이렇게 되면,
           // 사용자가 create form을 통해 db 쿼리문을 조작해 발생할 문제를 방지할 수 있다.
+          // ?로 대체하는 방법은 기본적으로 필요한 보안 기술들이 삽입되어 있다.
           db.query(`INSERT INTO topic (title, description, created, author_id )VALUES (?,?,NOW(),?)`,
           [post.title,post.description,post.author],function(error,topics) {
             if(error) throw error
